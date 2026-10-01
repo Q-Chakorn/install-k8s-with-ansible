@@ -1,0 +1,74 @@
+---
+- name: Prepare all nodes
+  hosts: k8s_cluster
+  become: true
+  roles:
+    - common
+    - containerd
+    - kubernetes
+
+- name: Initialize Kubernetes master
+  hosts: masters
+  become: true
+  tasks:
+    - name: Check if cluster is already initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubeadm_init
+
+    - name: Initialize the cluster
+      command: >
+        kubeadm init
+        --pod-network-cidr={{ pod_network_cidr }}
+        --service-cidr={{ service_cidr }}
+        --apiserver-advertise-address={{ ansible_host }}
+      when: not kubeadm_init.stat.exists
+      register: kubeadm_output
+
+    - name: Create .kube directory
+      file:
+        path: /home/{{ ansible_user }}/.kube
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Copy admin.conf to user's kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/{{ ansible_user }}/.kube/config
+        remote_src: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+
+    - name: Install Calico CNI
+      command: kubectl apply -f {{ calico_manifest_url }}
+      become: false
+      when: cni_plugin == "calico"
+
+    - name: Install Flannel CNI
+      command: kubectl apply -f {{ flannel_manifest_url }}
+      become: false
+      when: cni_plugin == "flannel"
+
+    - name: Get join command
+      command: kubeadm token create --print-join-command
+      register: join_command
+
+    - name: Set join command fact
+      set_fact:
+        kubeadm_join_command: "{{ join_command.stdout }}"
+
+- name: Join worker nodes
+  hosts: workers
+  become: true
+  tasks:
+    - name: Check if node already joined
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_conf
+
+    - name: Join the cluster
+      command: "{{ hostvars[groups['masters'][0]]['kubeadm_join_command'] }}"
+      when: not kubelet_conf.stat.exists

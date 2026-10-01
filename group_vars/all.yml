@@ -1,0 +1,25 @@
+---
+# Kubernetes version
+kubernetes_version: "1.30"
+kubernetes_apt_version: "1.30.*"
+
+# Pod network CIDR (for Calico/Flannel)
+pod_network_cidr: "10.244.0.0/16"
+
+# Service CIDR
+service_cidr: "10.96.0.0/12"
+
+# Container runtime
+container_runtime: containerd
+
+# Disable swap
+disable_swap: true
+
+# CNI plugin: calico, flannel
+cni_plugin: calico
+
+# Calico manifest URL
+calico_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml"
+
+# Flannel manifest URL (alternative)
+flannel_manifest_url: "https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml"
